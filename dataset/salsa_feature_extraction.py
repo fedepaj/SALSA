@@ -11,8 +11,8 @@ import numpy as np
 import yaml
 from sklearn import preprocessing
 from timeit import default_timer as timer
+from p_tqdm import p_umap
 from tqdm import tqdm
-
 
 def extract_normalized_eigenvector(X, condition_number: float = 5.0, n_hopframes: int = 3, is_tracking: bool = True,
                                    audio_format: str = 'foa', fs: int = None, n_fft: int = None, lower_bin: int = None):
@@ -348,39 +348,9 @@ def extract_features(data_config: str = 'configs/tnsse2021_salsa_feature_config.
             audio_fn_list = sorted(os.listdir(audio_dir))
 
             # Extract features
-            for count, audio_fn in enumerate(tqdm(audio_fn_list)):
-                full_audio_fn = os.path.join(audio_dir, audio_fn)
-                audio_input, _ = librosa.load(full_audio_fn, sr=fs, mono=False, dtype=np.float32)
-                # Extract stft feature (already remove the first frequency bin, correspond to fmin)
-                stft_feature = stft_feature_extractor.extract(audio_input)  # (n_channels, n_timesteps, 200)
-
-                # Extract mask and doa
-                # Compute stft
-                for imic in np.arange(n_mics):
-                    stft = librosa.stft(y=np.asfortranarray(audio_input[imic, :]), n_fft=n_fft, hop_length=hop_length,
-                                        center=True, window='hann', pad_mode='reflect')
-                    if imic == 0:
-                        n_frames = stft.shape[1]
-                        afeature = np.zeros((n_bins, n_frames, n_mics), dtype='complex')
-                    afeature[:, :, imic] = stft
-                X = afeature[lower_bin:upper_bin, :, :]
-                # compute normalized eigenvector
-                normed_eigenvector_mat = extract_normalized_eigenvector(
-                    X, condition_number=cond_num, n_hopframes=n_hopframes, is_tracking=is_tracking,
-                    audio_format=audio_format, fs=fs, n_fft=n_fft, lower_bin=lower_bin,)
-
-                # lower_bin now start at 0
-                full_eigenvector_mat = np.zeros((n_mics - 1, n_frames, freq_dim))
-                full_eigenvector_mat[:, :, :(upper_bin - lower_bin)] = np.transpose(normed_eigenvector_mat, (0, 2, 1))
-
-                # Stack features
-                audio_feature = np.concatenate((stft_feature, full_eigenvector_mat), axis=0)
-
-                # Write features to file
-                feature_fn = os.path.join(feature_dir, audio_fn.replace('wav', 'h5'))
-                with h5py.File(feature_fn, 'w') as hf:
-                    hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
-                tqdm.write('{}, {}, {}'.format(count, audio_fn, audio_feature.shape))
+            
+            p_umap(extract, audio_fn_list, [(audio_dir, fs, stft_feature_extractor, n_mics, n_fft, hop_length, n_bins, 
+                    lower_bin, upper_bin, cond_num, n_hopframes, is_tracking, audio_format, freq_dim, feature_dir) for _ in range(len(audio_fn_list))])
 
             print("Extracting feature finished! Elapsed time: {:.3f} s".format(timer() - start_time))
 
@@ -390,6 +360,39 @@ def extract_features(data_config: str = 'configs/tnsse2021_salsa_feature_config.
         feature_dir = os.path.join(cfg['feature_dir'], feature_type, audio_format, feature_description)
         compute_scaler(feature_dir=feature_dir, audio_format=audio_format)
 
+def extract(audio_fn, params):
+    audio_dir, fs, stft_feature_extractor, n_mics, n_fft, hop_length, n_bins, lower_bin, upper_bin, cond_num, n_hopframes, is_tracking, audio_format, freq_dim, feature_dir = params
+    full_audio_fn = os.path.join(audio_dir, audio_fn)
+    audio_input, _ = librosa.load(full_audio_fn, sr=fs, mono=False, dtype=np.float32)
+    # Extract stft feature (already remove the first frequency bin, correspond to fmin)
+    stft_feature = stft_feature_extractor.extract(audio_input)  # (n_channels, n_timesteps, 200)
+
+    # Extract mask and doa
+    # Compute stft
+    for imic in np.arange(n_mics):
+        stft = librosa.stft(y=np.asfortranarray(audio_input[imic, :]), n_fft=n_fft, hop_length=hop_length,
+                            center=True, window='hann', pad_mode='reflect')
+        if imic == 0:
+            n_frames = stft.shape[1]
+            afeature = np.zeros((n_bins, n_frames, n_mics), dtype='complex')
+        afeature[:, :, imic] = stft
+    X = afeature[lower_bin:upper_bin, :, :]
+    # compute normalized eigenvector
+    normed_eigenvector_mat = extract_normalized_eigenvector(
+        X, condition_number=cond_num, n_hopframes=n_hopframes, is_tracking=is_tracking,
+        audio_format=audio_format, fs=fs, n_fft=n_fft, lower_bin=lower_bin,)
+
+    # lower_bin now start at 0
+    full_eigenvector_mat = np.zeros((n_mics - 1, n_frames, freq_dim))
+    full_eigenvector_mat[:, :, :(upper_bin - lower_bin)] = np.transpose(normed_eigenvector_mat, (0, 2, 1))
+
+    # Stack features
+    audio_feature = np.concatenate((stft_feature, full_eigenvector_mat), axis=0)
+
+    # Write features to file
+    feature_fn = os.path.join(feature_dir, audio_fn.replace('wav', 'h5'))
+    with h5py.File(feature_fn, 'w') as hf:
+        hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
 
 if __name__ == '__main__':
     fire.Fire(extract_features)

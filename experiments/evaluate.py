@@ -17,7 +17,7 @@ def evaluate_seld(output_dir: str = '/media/tho_nguyen/disk2/new_seld/dcase2021/
                                     'salsa/seld_test/outputs/submissions/original/mic_test',
                   data_version: str = '2021',
                   metric_version: str = '2021',
-                  gt_meta_root_dir: str = '/media/tho_nguyen/disk1/audio_datasets/dcase2021/task3/',
+                  gt_meta_root_dir: str = '/home/fedepaj/Documenti/magistrale/NN/project/SALSA/data/',
                   is_eval_split: bool = False,
                   ):
     """

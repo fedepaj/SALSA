@@ -44,6 +44,8 @@ def train(exp_config: str = './configs/seld.yml',
     else:
         resume_from_checkpoint = None
 
+        
+
     # Load feature database
     feature_db = build_database(cfg=cfg)
 

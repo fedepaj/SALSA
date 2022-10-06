@@ -16,7 +16,7 @@ import yaml
 from sklearn import preprocessing
 from timeit import default_timer as timer
 from tqdm import tqdm
-
+from p_tqdm import p_umap
 
 class FeatureExtractor:
     """
@@ -673,16 +673,8 @@ def extract_features(data_config: str = 'configs/tnsse2021_feature_config.yml', 
             audio_fn_list = sorted(os.listdir(audio_dir))
 
             # Extract features
-            for count, audio_fn in enumerate(tqdm(audio_fn_list)):
-                full_audio_fn = os.path.join(audio_dir, audio_fn)
-                audio_input, _ = librosa.load(full_audio_fn, sr=fs, mono=False, dtype=np.float32)
-                audio_feature = feature_extractor.extract(audio_input)  # (n_channels, n_timesteps, n_mels)
-
-                # Write features to file
-                feature_fn = os.path.join(feature_dir, audio_fn.replace('wav', 'h5'))
-                with h5py.File(feature_fn, 'w') as hf:
-                    hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
-                tqdm.write('{}, {}, {}'.format(count, audio_fn, audio_feature.shape))
+            p_umap(extract, audio_fn_list, [(audio_dir, fs, feature_extractor, feature_dir) for _ in range(len(audio_fn_list))])
+                
 
             print("Extracting feature finished! Elapsed time: {:.3f} s".format(timer() - start_time))
 
@@ -692,6 +684,17 @@ def extract_features(data_config: str = 'configs/tnsse2021_feature_config.yml', 
         feature_dir = os.path.join(cfg['feature_dir'], feature_type, feature_description)
         compute_scaler(feature_dir=feature_dir, audio_format=audio_format)
 
+def extract(audio_fn, params):
+    audio_dir, fs, feature_extractor, feature_dir = params
+    full_audio_fn = os.path.join(audio_dir, audio_fn)
+    audio_input, _ = librosa.load(full_audio_fn, sr=fs, mono=False, dtype=np.float32)
+    audio_feature = feature_extractor.extract(audio_input)  # (n_channels, n_timesteps, n_mels)
+
+    # Write features to file
+    feature_fn = os.path.join(feature_dir, audio_fn.replace('wav', 'h5'))
+    with h5py.File(feature_fn, 'w') as hf:
+        hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
+    #tqdm.write('{}, {}, {}'.format(count, audio_fn, audio_feature.shape))
 
 if __name__ == '__main__':
     fire.Fire(extract_features)

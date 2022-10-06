@@ -28,9 +28,9 @@ salsa-lite:
 # Training and inference
 CONFIG_PATH=./experiments/configs/
 CONFIG_NAME=seld.yml
-OUTPUT=./outputs   # Directory to save output
+OUTPUT=./outputs_linspeciv   # Directory to save output
 EXP_SUFFIX=_test   # the experiment name = CONFIG_NAME + EXP_SUFFIX
-RESUME=False
+RESUME=True
 GPU_NUM=0  # Set to -1 if there is no GPU
 
 .phony: train
@@ -44,7 +44,7 @@ inference:
 
 # Evaluate
 OUTPUT_DIR=./outputs/crossval/foa/salsa/seld_test/outputs/submissions/original/foa_test
-GT_ROOT_DIR=/data/seld_dcase2021/task3
+GT_ROOT_DIR=./data/
 IS_EVAL_SPLIT=False
 
 .phony: evaluate

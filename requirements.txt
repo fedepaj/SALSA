@@ -1,0 +1,14 @@
+numpy
+scipy
+pandas
+scikit-learn
+h5py
+librosa
+tqdm
+pytorch-lightning==1.1.6
+tensorboardx
+pyyaml
+munch
+fire
+p_tqdm
+IPython
